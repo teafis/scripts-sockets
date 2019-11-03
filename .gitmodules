@@ -1,0 +1,3 @@
+[submodule "signals"]
+	path = signals
+	url = git@bitbucket.org:teafis/signals.git
