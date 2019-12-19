@@ -6,7 +6,7 @@ from datetime import datetime
 
 from enum import Enum
 
-from PyQt5 import QtCore as qt
+import struct
 
 signal_list_file = 'signals/signal_list.csv'
 
@@ -88,31 +88,17 @@ class SignalDefinition:
 
 
 def create_network_header(dev_from, category, signal_id, ts=None):
-    block = qt.QByteArray()
-    out = qt.QDataStream(block, qt.QIODevice.WriteOnly)
-
     if ts is None:
         dt = datetime.utcnow()
         timestamp_ms = dt.microsecond
     else:
         assert False
-
-    out.writeUInt8(dev_from)
-    out.writeUInt32(timestamp_ms)
-    out.writeUInt8(category)
-    out.writeUInt8(signal_id)
-
-    return bytes(block)
+        
+    return struct.pack('!BIBB', dev_from, timestamp_ms, category, signal_id)
 
 
-def create_analog_packet(data):
-    block = qt.QByteArray()
-    out = qt.QDataStream(block, qt.QIODevice.WriteOnly)
-
-    out.writeDouble(float(data))
-    out.writeUInt8(0)
-
-    return bytes(block)
+def create_analog_data(data):
+    return struct.pack('!dB', float(data), 0)
 
 
 class AnalogPacketDefinition:
@@ -132,6 +118,6 @@ class AnalogPacketDefinition:
             dev_from=self.dev_from,
             category=self.category,
             signal_id=self.signal_id)
-        analog_part = create_analog_packet(data=data)
+        analog_part = create_analog_data(data=data)
 
         return header + analog_part
