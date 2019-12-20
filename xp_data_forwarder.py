@@ -21,7 +21,7 @@ signal_list = efis.SignalList(efis.signal_list_file)
 
 def map_xplane_name_to_signal(xplane_name, signal_name):
     xplane_def = xpdata.XPlaneDataType.get_type_for_name(xplane_name, xp_udp.dataref_type_list)
-    signal_def = efis.AnalogPacketDefinition.from_signal_def(efis.PC_1_DEV_ID, signal_list.get_definition(signal_name))
+    signal_def = efis.AnalogPacket.from_signal_def(efis.PC_1_DEV_ID, signal_list.get_definition(signal_name))
     return xplane_def, signal_def
 
 

@@ -39,7 +39,7 @@ class Sensor:
         """
         Init function to construct the sensor class with an input name
         :param name: The name of the sensor
-        :type name: str
+        :type  name: str
         """
         # Add the next-highest sensor ID to the dictionary if it is not already in the list
         if name not in self.sensor_name_ids:
@@ -59,7 +59,7 @@ class Sensor:
         """
         Sets the input values and marks the sensor as being updated
         :param vals: list of sensor values
-        :type vals: list of float
+        :type  vals: list of float
         """
         # Set the values and mark updated as true
         self.vals = vals
@@ -90,23 +90,26 @@ class Sensor:
             *data_vals)
 
 
-def read_process_lines_to_queue(args_list, line_queue, stop_queue, return_code_queue):
+def read_process_json_to_queue(args_list, json_queue, stop_queue, return_code_queue):
     """
     Function to provide threading for reading input lines from an application
     :param args_list: arguments to open the subprocess
-    :type args_list: list of str
-    :param line_queue: queue that lines are put into after reading
-    :type line_queue: queue.Queue
+    :type  args_list: list of str
+    :param json_queue: queue that decoded JSON values are placed into
+    :type  json_queue: queue.Queue
     :param stop_queue: queue that signals the thread to stop when not empty
-    :type stop_queue: queue.Queue
+    :type  stop_queue: queue.Queue
     :param return_code_queue: queue to store the return code from the subprocess
-    :type return_code_queue: queue.Queue
+    :type  return_code_queue: queue.Queue
     :return: the process return code
     :rtype: int
     """
     # Create the process
     process = subprocess.Popen(args_list, stdout=subprocess.PIPE)
     rc = None
+
+    # Store the JSON line
+    json_str_list = None
 
     while rc is None:
         # Read a line of output
@@ -117,14 +120,36 @@ def read_process_lines_to_queue(args_list, line_queue, stop_queue, return_code_q
         if len(output) == 0 and process.poll() is not None:
             rc = process.poll()
         else:
-            line_queue.put(output)
+            # Decode the string and strip any newline characters
+            decoded_str = output.decode('utf-8').strip('\n')
+
+            # Check whether to create a new JSON string
+            if decoded_str == '{':
+                json_str_list = list()
+
+            # Perform tasks if the JSON string list is valid
+            if json_str_list is not None:
+                # Appent the decoded string to the list
+                json_str_list.append(decoded_str)
+
+                # Detect if we have closed the JSON parameters
+                if decoded_str == '}':
+                    # Decode the JSON results, put the resulting values into the queue
+                    try:
+                        decoded_val = json.loads('\n'.join(json_str_list))
+                        json_queue.put(decoded_val)
+                    except json.decoder.JSONDecodeError:
+                        pass
+
+                    # Clear the string
+                    json_str_list = None
 
         # Check the stop queue
         if not stop_queue.empty():
             process.send_signal(signal.SIGINT)
             process.wait()
             rc = process.poll()
-    
+
     # At end, return the process return code
     return_code_queue.put(rc)
     return rc
@@ -134,79 +159,58 @@ class ProcessSensorDecoder:
     """
     Wrapper class to surround a process to extract sensor information from stdout
     """
-    args_list = ['termux-sensor', '-s', '3-axis Accelerometer, 3-axis Gyroscope, Rotation Vector', '-d', '100']
+    #args_list = ['termux-sensor', '-s', '3-axis Accelerometer, 3-axis Gyroscope, Rotation Vector', '-d', '100']
+    args_list = ['./make.out']
 
     def __init__(self):
         """
-        Initializes the process JSON decoder with an initial process
-        :param process: Process to parse stdout for useful JSON data
-        :type process: subprocess.Process
+        Initializes the process JSON decoder and starts a new process on another thread to read JSON input from
         """
         # Set the input parameters
-        #self.process = process
-        self.json_str = None
         self.rc = None
-        self.line_queue = queue.Queue()
+        self.json_queue = queue.Queue()
         self.stop_queue = queue.Queue()
         self.return_code_queue = queue.Queue()
+        self.sensors = dict()
 
         # Create and start the thread
         self.process_thread = threading.Thread(
-            target=read_process_lines_to_queue,
-            args=[self.args_list, self.line_queue, self.stop_queue, self.return_code_queue])
+            target=read_process_json_to_queue,
+            args=[self.args_list, self.json_queue, self.stop_queue, self.return_code_queue])
         self.process_thread.start()
 
-    def poll(self, sensors, line_limit_count=25):
+    def poll(self, json_limit_count=25):
         """
-        Parses the process stdout to extract sensor JSON information
+        Reads the unpacked JSON data provided by the process thread and parses into sensor information
+        :param json_limit_count: the number of JSON packets to limit if more are present in the queue
+        :type  json_limit_count: int
         :return: None if the process is still performing, return code if process has completed
         :rtype: None or int
         """
-        # Return RC if process has already ended 
+        # Return RC if process has already ended
         if self.rc is not None:
             return self.rc
 
         # Define the line count
-        line_count = 0
+        json_count = 0
 
         # Loop while until line_queue is empty or the line count has been met
-        while not self.line_queue.empty() and line_count < line_limit_count:
+        while not self.json_queue.empty() and json_count < json_limit_count:
             # Read a line of output
-            output = self.line_queue.get()
-            line_count += 1
+            json_data = self.json_queue.get()
 
-            # Decode the string and strip any newline characters
-            decoded_str = output.decode('utf-8').strip('\n')
+            # Iterate over each sensor provided
+            for sensor_name, sensor_dict in json_data.items():
+                # If a sensor class is not yet provided, create one
+                if sensor_name not in self.sensors:
+                    self.sensors[sensor_name] = Sensor(sensor_name)
 
-            # Check whether to create a new JSON string
-            if decoded_str == '{':
-                self.json_str = list()
+                # Extract the sensor parameter
+                sensor = self.sensors[sensor_name]
 
-            # Perform tasks if the JSON string list is valid
-            if self.json_str is not None:
-                # Appent the decoded string to the list
-                self.json_str.append(decoded_str)
-
-                # Detect if we have closed the JSON parameters
-                if decoded_str == '}':
-                    # Decode the JSON results and clear the string list
-                    decoded_val = json.loads('\n'.join(self.json_str))
-                    self.json_str = None
-
-                    # Skip over sensor processing if sensors are None
-                    if sensors is not None:
-                        # Iterate over each sensor provided
-                        for sensor_name, sensor_dict in decoded_val.items():
-                            # If a sensor class is not yet provided, create one
-                            if sensor_name not in sensors:
-                                sensors[sensor_name] = Sensor(sensor_name)
-
-                            # Extract the sensor parameter
-                            sensor = sensors[sensor_name]
-
-                            # Set the values to the decoded values in the sensor parameters
-                            if 'values' in sensor_dict:
-                                sensor.set_values(sensor_dict['values'])
+                # Set the values to the decoded values in the sensor parameters
+                if 'values' in sensor_dict:
+                    sensor.set_values(sensor_dict['values'])
 
         # Get the return code if ended
         # Otherwise, return None
@@ -215,7 +219,7 @@ class ProcessSensorDecoder:
         else:
             self.stop()
             return self.rc
-    
+
     def stop(self):
         """
         Requests a stop of the reading thread
@@ -231,13 +235,12 @@ class ProcessSensorDecoder:
 def main(ip_addr):
     """
     Main function
+    :param ip_addr: the IP address to send information to
+    :type  ip_addr: str
     """
-    # Create the dictionary to read in sensor values
-    sensors = dict()
-    
     # Read the signal list
     signal_list = efis.SignalList(efis.signal_list_file)
-    
+
     # Extract the desired packet names
     analog_packet_names = [
         'att_pitch',
@@ -248,10 +251,10 @@ def main(ip_addr):
             efis.PC_1_DEV_ID,
             signal_list.get_definition(name))
         for name in analog_packet_names]
-    
+
     # Create a socket
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    
+
     # Print existing IDs
     print('Current IDs:')
     for s, i in Sensor.sensor_name_ids.items():
@@ -266,7 +269,7 @@ def main(ip_addr):
 
         def tic(self):
             self.st = time.time()
-        
+
         def toc(self):
             return time.time() - self.st
 
@@ -282,9 +285,9 @@ def main(ip_addr):
         packets_sent = 0
 
         # Loop the process decoder while parameters are available
-        while process_decoder.poll(sensors) is None:
+        while process_decoder.poll() is None:
             # Determine which sensors have been updated
-            updated_sensors = [v for v in sensors.values() if v.updated]
+            updated_sensors = [v for v in process_decoder.sensors.values() if v.updated]
 
             # Print results if any have been updated
             if len(updated_sensors) > 0:
@@ -298,16 +301,16 @@ def main(ip_addr):
                     print('Delta Packets Sent: {:d}'.format(packets_sent))
                     et.tic()
                     packets_sent = 0
-            
+
             # Send pitch/roll packets
-            if 'Game Rotation Vector' in sensors:
-                rotation_sensor = sensors['Game Rotation Vector']
+            if 'Game Rotation Vector' in process_decoder.sensors:
+                rotation_sensor = process_decoder.sensors['Game Rotation Vector']
                 data_vals = [d *90.0 for d in rotation_sensor.vals[0:2]]
                 sock.sendto(analog_packets[0].create_packet_with_data(data_vals[0]), (ip_addr, 7777))
                 sock.sendto(analog_packets[1].create_packet_with_data(data_vals[1]), (ip_addr, 7777))
                 print('Sent data {:.2f}, {:.2f}'.format(*data_vals))
 
-            
+
     except KeyboardInterrupt:
         if process_decoder is not None:
             process_decoder.stop()
@@ -323,3 +326,4 @@ if __name__ == '__main__':
         main(sys.argv[1])
     else:
         print('No IP Address Provided')
+        #main('127.0.0.1')

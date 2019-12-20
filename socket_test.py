@@ -26,7 +26,7 @@ analog_packet_names = [
     'att_roll']
 
 analog_packets = [
-    efis.AnalogPacketDefinition.from_signal_def(
+    efis.AnalogPacket.from_signal_def(
         efis.PC_1_DEV_ID,
         signal_list.get_definition(name))
     for name in analog_packet_names]
