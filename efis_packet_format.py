@@ -69,7 +69,7 @@ class SignalList:
                     s1 = self.def_list[key_i]
                     s2 = self.def_list[key_j]
 
-                    if s1.cat_id == s2.cat_id and s1.sig_id == s2.sig_id:
+                    if s1.cat_id == s2.cat_id and s1.sub_id == s2.sub_id:
                         ValueError('Cannot have two signals with the same category and signal ids')
 
     def get_definition(self, name):
@@ -91,13 +91,13 @@ class SignalDefinition:
     Class to maintain the definition for a signal type
     """
 
-    def __init__(self, cat_id, sig_id, name, unit, sig_type, timeout_msec):
+    def __init__(self, cat_id, sub_id, name, unit, sig_type, timeout_msec):
         """
         Creates a signal definition for the provided input parameters
         :param cat_id: the category ID for the signal
         :type  cat_id: int
-        :param sig_id: the signal ID for the signal
-        :type  sig_id: int
+        :param sub_id: the signal ID for the signal
+        :type  sub_id: int
         :param unit: the unit assiciated with the signal
         :type  unit: str
         :param sig_type: the signal type
@@ -106,7 +106,7 @@ class SignalDefinition:
         :type  timeout_msec: int
         """
         self.cat_id = cat_id
-        self.sig_id = sig_id
+        self.sub_id = sub_id
         self.name = name
         self.unit = unit
         self.sig_type = sig_type
@@ -116,7 +116,7 @@ class SignalDefinition:
     def from_csv_line(line):
         """
         Provides a signal definition from a signle comma-separated line of the signal list, in the form
-          CategoryID,SignalID,Name,Units,Type,TimeoutMsec
+          CategoryID,SubID,Name,Units,Type,TimeoutMsec
         :param line: the line to extract the signal definition from
         :type  line: str
         :return: the signal definition for the values found in the line
@@ -131,7 +131,7 @@ class SignalDefinition:
 
         # Extract the signal parameters
         cat_id = int(words[0])
-        sig_id = int(words[1])
+        sub_id = int(words[1])
         name = words[2]
         unit = words[3]
         sig_type = words[4]
@@ -144,7 +144,7 @@ class SignalDefinition:
         # Create and return the signal definition
         return SignalDefinition(
             cat_id=cat_id,
-            sig_id=sig_id,
+            sub_id=sub_id,
             name=name,
             unit=unit,
             sig_type=sig_type,
@@ -157,19 +157,19 @@ class GenericPacket:
     """
     _expected_type = None
 
-    def __init__(self, dev_from_id, cat_id, sig_id):
+    def __init__(self, dev_from_id, cat_id, sub_id):
         """
         Initializes the packet with the provided information
         :param dev_from_id: the ID of the sending device
         :type  dev_from_id: int
         :param cat_id: the category ID for the packet
         :type  cat_id: int
-        :param sig_id: the signal ID for the packet
-        :type  sig_id: int
+        :param sub_id: the signal ID for the packet
+        :type  sub_id: int
         """
         self.dev_from_id = dev_from_id
         self.cat_id = cat_id
-        self.sig_id = sig_id
+        self.sub_id = sub_id
 
     @classmethod
     def from_signal_def(cls, dev_from_id, signal_def):
@@ -189,7 +189,7 @@ class GenericPacket:
         return cls(
             dev_from_id=dev_from_id,
             cat_id=signal_def.cat_id,
-            sig_id=signal_def.sig_id)
+            sub_id=signal_def.sub_id)
 
     def _create_network_header(self, ts=None):
         """
@@ -212,7 +212,7 @@ class GenericPacket:
             self.dev_from_id,
             timestamp_ms,
             self.cat_id,
-            self.sig_id)
+            self.sub_id)
 
     def _create_data_bytes(self, data_input):
         """

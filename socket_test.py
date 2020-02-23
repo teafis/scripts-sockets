@@ -23,7 +23,8 @@ analog_packet_names = [
     'speed_ias',
     'altitude_msl',
     'att_pitch',
-    'att_roll']
+    'att_roll',
+    'heading_mag']
 
 analog_packets = [
     efis.AnalogPacket.from_signal_def(
@@ -38,6 +39,7 @@ analog_min_vals = [
     0,
     -1000,
     -30,
+    -60,
     -60]
 analog_max_vals = [
     3200,
@@ -46,7 +48,8 @@ analog_max_vals = [
     270,
     18000,
     30,
-    60]
+    60,
+    30]
 analog_incrementor_vals = [
     10,
     1,
@@ -54,8 +57,10 @@ analog_incrementor_vals = [
     0.1,
     1,
     0.1,
+    0.1,
     0.1]
 analog_vals = [
+    0,
     0,
     0,
     0,
