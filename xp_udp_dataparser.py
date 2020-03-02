@@ -41,6 +41,20 @@ class XPlaneDataType:
             units='deg'))
 
         type_list.append(XPlaneDataType(
+            name='HeadingTrue',
+            dataref_id=17,
+            dataref_type='f',
+            dataref_num=2,
+            units='deg'))
+
+        type_list.append(XPlaneDataType(
+            name='HeadingMag',
+            dataref_id=17,
+            dataref_type='f',
+            dataref_num=3,
+            units='deg'))
+
+        type_list.append(XPlaneDataType(
             name='Latitude',
             dataref_id=20,
             dataref_type='f',

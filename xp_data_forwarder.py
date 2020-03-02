@@ -35,7 +35,9 @@ xp_to_efis_links = [
     map_xplane_name_to_signal('AirspeedIndicated', 'speed_ias'),
     map_xplane_name_to_signal('Groundspeed', 'speed_gs'),
     map_xplane_name_to_signal('Pitch', 'att_pitch'),
-    map_xplane_name_to_signal('Roll', 'att_roll')]
+    map_xplane_name_to_signal('Roll', 'att_roll'),
+    map_xplane_name_to_signal('HeadingTrue', 'heading_true'),
+    map_xplane_name_to_signal('HeadingMag', 'heading_mag')]
 
 
 try:
@@ -60,7 +62,7 @@ try:
             xp_dataref = xp_udp.dataref_dict[dataref_id]
             data = xp_dataref[dataref_num]
 
-            packet = link[1].create_packet_with_data(data=data)
+            packet = link[1].create_packet_with_data(data_input=data)
 
             for ip in UDP_IPS:
                 sock.sendto(packet, (ip, UDP_PORT))
