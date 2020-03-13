@@ -18,8 +18,8 @@ sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)  # UDP
 
 analog_packet_names = [
     'engine_rpm',
-    'oil_pressure',
     'oil_temperature',
+    'oil_pressure',
     'speed_ias',
     'altitude_msl',
     'att_pitch',
