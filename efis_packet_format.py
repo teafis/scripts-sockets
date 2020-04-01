@@ -56,7 +56,7 @@ class SignalList:
                 s_def = SignalDefinition.from_csv_line(line)
 
                 if s_def.name in self.def_list:
-                    ValueError('Cannot have to signals with the same definition in the signal list')
+                    raise ValueError('Cannot have to signals with the same definition in the signal list')
                 else:
                     self.def_list[s_def.name] = s_def
 
@@ -70,7 +70,7 @@ class SignalList:
                     s2 = self.def_list[key_j]
 
                     if s1.cat_id == s2.cat_id and s1.sub_id == s2.sub_id:
-                        ValueError('Cannot have two signals with the same category and signal ids')
+                        raise ValueError('Cannot have two signals with the same category and signal ids')
 
     def get_definition(self, name):
         """
@@ -126,7 +126,7 @@ class SignalDefinition:
         words = [l.strip() for l in line.split(',')]
 
         # Ensure that there is the expected number of parameters
-        if len(words) != 6:
+        if len(words) != 7:
             raise ValueError('Invalid number of parameters found in the line, expecting 6, got {:d}'.format(len(words)))
 
         # Extract the signal parameters
@@ -137,18 +137,48 @@ class SignalDefinition:
         sig_type = words[4]
         timeout_msec = int(words[5])
 
+        if words[6] == 'semi2deg':
+            resolution = 180.0 / 2**31
+        else:
+            resolution = float(words[6])
+
         # Check that the signal type is the value expected
-        if sig_type != 'double':
+        if sig_type != 'fixed':
             raise ValueError('Signals of type other than "double" not yet supported')
 
         # Create and return the signal definition
-        return SignalDefinition(
+        return AnalogSignalDefinition(
             cat_id=cat_id,
             sub_id=sub_id,
             name=name,
             unit=unit,
             sig_type=sig_type,
-            timeout_msec=timeout_msec)
+            timeout_msec=timeout_msec,
+            resolution=resolution)
+
+
+class AnalogSignalDefinition(SignalDefinition):
+    """
+    Class to maintain the definition for an analog signal type
+    """
+    def __init__(self, cat_id, sub_id, name, unit, sig_type, timeout_msec, resolution):
+        """
+        Creates a signal definition for the provided input parameters
+        :param cat_id: the category ID for the signal
+        :type  cat_id: int
+        :param sub_id: the signal ID for the signal
+        :type  sub_id: int
+        :param unit: the unit assiciated with the signal
+        :type  unit: str
+        :param sig_type: the signal type
+        :type  sig_type: str
+        :param timeout_msec: the number of milliseconds until timeout for the signal
+        :type  timeout_msec: int
+        :param resolution: the resolution to multiply network data by to get the engineering data
+        :type resolution: float
+        """
+        super().__init__(cat_id, sub_id, name, unit, sig_type, timeout_msec)
+        self.resolution = resolution
 
 
 class GenericPacket:
@@ -157,7 +187,7 @@ class GenericPacket:
     """
     _expected_type = None
 
-    def __init__(self, dev_from_id, cat_id, sub_id):
+    def __init__(self, dev_from_id, cat_id, sub_id, signal_def):
         """
         Initializes the packet with the provided information
         :param dev_from_id: the ID of the sending device
@@ -166,10 +196,13 @@ class GenericPacket:
         :type  cat_id: int
         :param sub_id: the signal ID for the packet
         :type  sub_id: int
+        :param signal_def: the signal definition for the packet parameter
+        :type signal_def: SignalDefinition
         """
         self.dev_from_id = dev_from_id
         self.cat_id = cat_id
         self.sub_id = sub_id
+        self.signal_def = signal_def
 
     @classmethod
     def from_signal_def(cls, dev_from_id, signal_def):
@@ -189,7 +222,8 @@ class GenericPacket:
         return cls(
             dev_from_id=dev_from_id,
             cat_id=signal_def.cat_id,
-            sub_id=signal_def.sub_id)
+            sub_id=signal_def.sub_id,
+            signal_def=signal_def)
 
     def _create_network_header(self, ts=None):
         """
@@ -253,7 +287,7 @@ class AnalogPacket(GenericPacket):
     """
     Packet type for analog double values within packets
     """
-    _expected_type = 'double'
+    _expected_type = 'fixed'
 
     def _create_data_bytes(self, data_input):
         """
@@ -263,4 +297,4 @@ class AnalogPacket(GenericPacket):
         :return: packed data bytes
         :rtype: bytes
         """
-        return struct.pack('!d', float(data_input))
+        return struct.pack('!i', int(data_input / self.signal_def.resolution))
