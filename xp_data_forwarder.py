@@ -5,6 +5,8 @@ Forwards data from X-Plane to any requested IP address and port
 import socket
 import time
 
+import math
+
 import efis_packet_format as efis
 import xp_udp_dataparser as xpdata
 from forward_ip_addresses import UDP_IPS, UDP_PORT
@@ -51,9 +53,6 @@ try:
         for link in xp_to_efis_links:
             dataref_id = link[0].dataref_id
 
-            if dataref_id == xp_to_efis_links[-1][0].dataref_id:
-                a = 3
-
             if dataref_id not in xp_udp.dataref_dict:
                 continue
 
@@ -61,6 +60,15 @@ try:
 
             xp_dataref = xp_udp.dataref_dict[dataref_id]
             data = xp_dataref[dataref_num]
+
+            if link[0].name == 'HeadingTrue' or link[0].name == 'HeadingMag':
+                if data > 180:
+                    data = data - 360
+
+                if data > 180:
+                    data = 180
+                elif data < -180:
+                    data = -180
 
             packet = link[1].create_packet_with_data(data_input=data)
 
