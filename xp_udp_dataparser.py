@@ -84,7 +84,7 @@ class XPlaneDataType:
 
         type_list.append(XPlaneDataType(
             name='RPM',
-            dataref_id=37,
+            dataref_id=38,
             dataref_type='f',
             dataref_num=0,
             units='rpm'))
